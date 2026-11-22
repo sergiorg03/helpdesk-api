@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -10,9 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
-    from app.models.ticket import Ticket
-    from app.models.comment import Comment
-    from app.models.ticket_history import TicketHistory
+    from app.models import Ticket, Comment, TicketHistory
 
 
 class User(Base):
