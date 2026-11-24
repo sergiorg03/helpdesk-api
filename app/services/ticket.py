@@ -3,9 +3,15 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import Ticket, User
+from app.models import Ticket, User, TicketHistory
 from app.models.enums import UserRole
-from app.repositories import ticket as ticket_repository
+
+from app.repositories import (
+    ticket as ticket_repository,
+    ticket_history as history_repository,
+)
+
+from app.schemas import TicketUpdate
 
 
 def create_ticket(
@@ -86,7 +92,24 @@ def update_ticket(
             detail="Customers cannot update tickets",
         )
 
-    ticket_repository.update(db, ticket, update_data)
+    tracked_fields = {"status", "priority", "assigned_to_id"}
+
+    for field, new_value in update_data.items():
+        old_value = getattr(ticket, field)
+
+        if field in tracked_fields and old_value != new_value:
+            history_entry = TicketHistory(
+                ticket_id=ticket.id,
+                changed_by_id=current_user.id,
+                field_changed=field,
+                old_value=str(old_value) if old_value is not None else None,
+                new_value=str(new_value) if new_value is not None else "UNASSIGNED",
+            )
+
+            history_repository.create(db, history_entry)
+
+        setattr(ticket, field, new_value)
+
     db.commit()
     db.refresh(ticket)
 
