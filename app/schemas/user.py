@@ -1,7 +1,15 @@
 from uuid import UUID
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+)
+
+from app.models.enums import UserRole
 
 
 class UserCreate(BaseModel):
@@ -11,9 +19,20 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    username: str | None = Field(default=None, min_length=3, max_length=50)
+    username: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=50,
+    )
     email: EmailStr | None = None
     is_active: bool | None = None
+
+    @field_validator("username", "email", "is_active", mode="before")
+    @classmethod
+    def reject_null_values(cls, value):
+        if value is None:
+            raise ValueError("This field cannot be null")
+        return value
 
 
 class UserResponse(BaseModel):
@@ -25,3 +44,7 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserRoleUpdate(BaseModel):
+    role: UserRole

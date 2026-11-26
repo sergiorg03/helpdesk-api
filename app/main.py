@@ -3,6 +3,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.tickets import router as tickets_router
 from app.api.routes.comments import router as comments_router
 from app.api.routes.ticket_history import router as ticket_history_router
+from app.api.routes.users import router as user_router
 
 app = FastAPI(
     title="HelpDesk API",
@@ -14,6 +15,7 @@ app.include_router(auth_router)
 app.include_router(tickets_router)
 app.include_router(comments_router)
 app.include_router(ticket_history_router)
+app.include_router(user_router)
 
 
 @app.get("/health", tags=["Health"])
