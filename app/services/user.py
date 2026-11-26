@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from app.models import User
 from app.models.enums import UserRole
 from app.repositories import user as user_repository
-from app.schemas import UserUpdate
 from app.schemas import UserUpdate, UserRoleUpdate
 
 
@@ -55,6 +54,15 @@ def update_user(
 ) -> User:
     user = get_user(db, user_id, current_user)
 
+    if (
+        "is_active" in user_data.model_fields_set
+        and user.role == UserRole.ADMIN
+        and user.is_active
+        and user_data.is_active is False
+    ):
+        user_repository.lock_admin_changes(db)
+        user_repository.refresh_user(db, user)
+
     update_data = user_data.model_dump(exclude_unset=True)
 
     if "is_active" in update_data:
@@ -71,10 +79,10 @@ def update_user(
             )
 
         if (
-        user.role == UserRole.ADMIN
-        and user.is_active
-        and update_data["is_active"] is False
-        and user_repository.count_active_admins(db) <= 1
+            user.role == UserRole.ADMIN
+            and user.is_active
+            and update_data["is_active"] is False
+            and user_repository.count_active_admins(db) <= 1
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -139,10 +147,18 @@ def update_user_role(
         )
 
     if (
-    user.role == UserRole.ADMIN
-    and user.is_active
-    and role_data.role != UserRole.ADMIN
-    and user_repository.count_active_admins(db) <= 1
+        user.role == UserRole.ADMIN
+        and user.is_active
+        and role_data.role != UserRole.ADMIN
+    ):
+        user_repository.lock_admin_changes(db)
+        user_repository.refresh_user(db, user)
+
+    if (
+        user.role == UserRole.ADMIN
+        and user.is_active
+        and role_data.role != UserRole.ADMIN
+        and user_repository.count_active_admins(db) <= 1
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

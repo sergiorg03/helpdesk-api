@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.orm import Session
 
 from app.models import User
@@ -55,3 +55,17 @@ def count_active_admins(db: Session) -> int:
     )
 
     return db.scalar(statement) or 0
+
+
+def lock_admin_changes(db: Session) -> None:
+    """
+    Serialize operations that can change active administrator membership.
+    PostgreSQL only; SQLite tests do not require this lock.
+    """
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(74201931)"))
+
+
+def refresh_user(db: Session, user: User) -> User:
+    db.refresh(user)
+    return user
