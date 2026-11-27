@@ -289,3 +289,69 @@ def test_get_history_of_nonexistent_user_returns_404(client, db_session):
     )
 
     assert response.status_code == 404
+
+
+def test_admin_can_create_user(client, db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+
+    response = client.post(
+        "/users/",
+        headers=get_auth_headers(admin),
+        json={
+            "username": "new_customer",
+            "email": "new@example.com",
+            "password": "SecurePassword123",
+        },
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["username"] == "new_customer"
+    assert data["role"] == "CUSTOMER"
+    assert "hashed_password" not in data
+
+
+def test_customer_cannot_create_user(client, db_session):
+    customer = create_test_user(db_session, "customer", "CUSTOMER")
+
+    response = client.post(
+        "/users/",
+        headers=get_auth_headers(customer),
+        json={
+            "username": "new_customer",
+            "email": "new@example.com",
+            "password": "SecurePassword123",
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_create_user_rejects_duplicate_username(client, db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+    create_test_user(db_session, "existing", "CUSTOMER")
+
+    response = client.post(
+        "/users/",
+        headers=get_auth_headers(admin),
+        json={
+            "username": "existing",
+            "email": "different@example.com",
+            "password": "SecurePassword123",
+        },
+    )
+
+    assert response.status_code == 409
+
+
+def test_create_user_requires_authentication(client):
+    response = client.post(
+        "/users/",
+        json={
+            "username": "new_customer",
+            "email": "new@example.com",
+            "password": "SecurePassword123",
+        },
+    )
+
+    assert response.status_code == 401

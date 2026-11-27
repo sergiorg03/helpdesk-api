@@ -1,10 +1,16 @@
 import pytest
 from fastapi import HTTPException
 
+from app.core.security import verify_password
+
 from app.models import User
 from app.models.enums import UserRole
-from app.schemas import UserUpdate, UserRoleUpdate
+
+from app.schemas import UserUpdate, UserRoleUpdate, UserCreate
+
 from app.services import user as user_service
+from app.services.user import create_user
+
 from app.repositories import user as user_repository
 
 
@@ -184,3 +190,84 @@ def test_admin_can_demote_another_admin_when_multiple_exist(db_session):
     )
 
     assert updated.role == UserRole.TECHNICIAN
+
+
+def test_admin_can_create_customer(db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+
+    user_data = UserCreate(
+        username="new_customer",
+        email="new@example.com",
+        password="SecurePassword123",
+    )
+
+    user = create_user(db_session, user_data, admin)
+
+    assert user.username == "new_customer"
+    assert user.email == "new@example.com"
+    assert user.role == UserRole.CUSTOMER
+    assert user.is_active is True
+    assert user.hashed_password != "SecurePassword123"
+    assert verify_password("SecurePassword123", user.hashed_password)
+
+
+def test_admin_can_create_user_with_custom_role(db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+
+    user_data = UserCreate(
+        username="new_technician",
+        email="technician@example.com",
+        password="SecurePassword123",
+        role=UserRole.TECHNICIAN,
+    )
+
+    user = create_user(db_session, user_data, admin)
+
+    assert user.role == UserRole.TECHNICIAN
+
+
+def test_customer_cannot_create_users(db_session):
+    customer = create_test_user(db_session, "customer", "CUSTOMER")
+
+    user_data = UserCreate(
+        username="new_user",
+        email="new@example.com",
+        password="SecurePassword123",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        create_user(db_session, user_data, customer)
+
+    assert exc.value.status_code == 403
+
+
+def test_create_user_rejects_duplicate_username(db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+    create_test_user(db_session, "existing", "CUSTOMER")
+
+    user_data = UserCreate(
+        username="existing",
+        email="different@example.com",
+        password="SecurePassword123",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        create_user(db_session, user_data, admin)
+
+    assert exc.value.status_code == 409
+
+
+def test_create_user_rejects_duplicate_email(db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+    create_test_user(db_session, "existing", "CUSTOMER")
+
+    user_data = UserCreate(
+        username="new_user",
+        email="existing@example.com",
+        password="SecurePassword123",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        create_user(db_session, user_data, admin)
+
+    assert exc.value.status_code == 409
