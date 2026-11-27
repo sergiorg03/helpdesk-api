@@ -9,7 +9,9 @@ from app.repositories import (
     user as user_repository,
     user_history as user_history_repository,
 )
-from app.schemas import UserUpdate, UserRoleUpdate
+from app.schemas import UserUpdate, UserRoleUpdate, UserCreate
+
+from app.core.security import hash_password
 
 
 def get_users(
@@ -220,3 +222,42 @@ def get_user_history(
     get_user(db, user_id, current_user)
 
     return user_history_repository.get_by_user(db, user_id)
+
+
+def create_user(
+    db: Session,
+    user_data: UserCreate,
+    current_user: User,
+) -> User:
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+
+    if user_repository.get_by_username(db, user_data.username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already exists",
+        )
+
+    if user_repository.get_by_email(db, user_data.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already exists",
+        )
+
+    new_user = User(
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password=hash_password(user_data.password),
+        role=user_data.role,
+        is_active=True,
+    )
+
+    user_repository.create(db, new_user)
+
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
