@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DATABASE_URL: ""
+      DATABASE_URL: "sqlite:///./ci.db"
       SECRET_KEY: "ci-test-secret-key-not-for-production"
 
     steps:
