@@ -48,3 +48,15 @@ class UserResponse(BaseModel):
 
 class UserRoleUpdate(BaseModel):
     role: UserRole
+
+
+class UserHistoryResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    changed_by_id: UUID
+    field_changed: str
+    old_value: str | None
+    new_value: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

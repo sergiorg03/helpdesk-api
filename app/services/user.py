@@ -3,9 +3,12 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import User, UserHistory
 from app.models.enums import UserRole
-from app.repositories import user as user_repository
+from app.repositories import (
+    user as user_repository,
+    user_history as user_history_repository,
+)
 from app.schemas import UserUpdate, UserRoleUpdate
 
 
@@ -113,6 +116,12 @@ def update_user(
                 detail="Email already exists",
             )
 
+    _record_user_changes(
+        db,
+        user,
+        current_user,
+        update_data,
+    )
     user_repository.update(db, user, update_data)
     db.commit()
     db.refresh(user)
@@ -165,9 +174,49 @@ def update_user_role(
             detail="Cannot change the role of the last active administrator",
         )
 
-    user.role = role_data.role
+    _record_user_changes(
+        db,
+        user,
+        current_user,
+        {"role": role_data.role},
+    )
 
+    user.role = role_data.role
     db.commit()
     db.refresh(user)
 
     return user
+
+
+def _record_user_changes(
+    db: Session,
+    user: User,
+    current_user: User,
+    changes: dict,
+) -> None:
+    for field, new_value in changes.items():
+        old_value = getattr(user, field)
+
+        if old_value == new_value:
+            continue
+
+        history_entry = UserHistory(
+            user_id=user.id,
+            changed_by_id=current_user.id,
+            field_changed=field,
+            old_value=str(old_value) if old_value is not None else None,
+            new_value=str(new_value),
+        )
+
+        user_history_repository.create(db, history_entry)
+
+
+def get_user_history(
+    db: Session,
+    user_id: UUID,
+    current_user: User,
+) -> list[UserHistory]:
+    # Reutiliza las comprobaciones de existencia y permisos.
+    get_user(db, user_id, current_user)
+
+    return user_history_repository.get_by_user(db, user_id)

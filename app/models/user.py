@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
-    from app.models import Ticket, Comment, TicketHistory
+    from app.models import Ticket, Comment, TicketHistory, UserHistory
 
 
 class User(Base):
@@ -71,4 +71,14 @@ class User(Base):
 
     ticket_history: Mapped[list["TicketHistory"]] = relationship(
         back_populates="changed_by",
+    )
+
+    user_history: Mapped[list["UserHistory"]] = relationship(
+        back_populates="user",
+        foreign_keys="UserHistory.user_id",
+    )
+
+    user_history_changes: Mapped[list["UserHistory"]] = relationship(
+        back_populates="changed_by",
+        foreign_keys="UserHistory.changed_by_id",
     )

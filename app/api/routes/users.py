@@ -8,7 +8,7 @@ from app.core.permissions import require_roles
 from app.db.dependencies import get_db
 from app.models import User
 from app.models.enums import UserRole
-from app.schemas import UserResponse, UserUpdate, UserRoleUpdate
+from app.schemas import UserResponse, UserUpdate, UserRoleUpdate, UserHistoryResponse
 from app.services import user as user_service
 
 router = APIRouter(
@@ -75,4 +75,20 @@ def update_user_role(
         user_id,
         role_data,
         current_user,
+    )
+
+
+@router.get(
+    "/{user_id}/history",
+    response_model=list[UserHistoryResponse],
+)
+def get_user_history(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return user_service.get_user_history(
+        db,
+        user_id=user_id,
+        current_user=current_user,
     )
