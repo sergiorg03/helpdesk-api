@@ -220,3 +220,72 @@ def test_unauthenticated_user_cannot_list_users(client):
     response = client.get("/users/")
 
     assert response.status_code == 401
+
+
+def test_user_can_get_own_history(client, db_session):
+    customer = create_test_user(db_session, "customer", "CUSTOMER")
+
+    response = client.patch(
+        f"/users/{customer.id}",
+        headers=get_auth_headers(customer),
+        json={"username": "new_customer"},
+    )
+    assert response.status_code == 200
+
+    response = client.get(
+        f"/users/{customer.id}/history",
+        headers=get_auth_headers(customer),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["field_changed"] == "username"
+    assert data[0]["old_value"] == "customer"
+    assert data[0]["new_value"] == "new_customer"
+
+
+def test_admin_can_get_another_user_history(client, db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+    customer = create_test_user(db_session, "customer", "CUSTOMER")
+
+    client.patch(
+        f"/users/{customer.id}",
+        headers=get_auth_headers(admin),
+        json={"is_active": False},
+    )
+
+    response = client.get(
+        f"/users/{customer.id}/history",
+        headers=get_auth_headers(admin),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["field_changed"] == "is_active"
+
+
+def test_customer_cannot_get_another_user_history(client, db_session):
+    customer = create_test_user(db_session, "customer", "CUSTOMER")
+    another = create_test_user(db_session, "another", "CUSTOMER")
+
+    response = client.get(
+        f"/users/{another.id}/history",
+        headers=get_auth_headers(customer),
+    )
+
+    assert response.status_code == 403
+
+
+def test_get_history_of_nonexistent_user_returns_404(client, db_session):
+    admin = create_test_user(db_session, "admin", "ADMIN")
+
+    from uuid import uuid4
+
+    response = client.get(
+        f"/users/{uuid4()}/history",
+        headers=get_auth_headers(admin),
+    )
+
+    assert response.status_code == 404
